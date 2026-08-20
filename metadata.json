@@ -1,0 +1,6 @@
+{
+  "name": "MailMind - AI Email Intelligence Dashboard",
+  "description": "Real-time testing dashboard to verify AI email intelligence workflows, classifications, action items, deadlines, and Supabase data synchronization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
