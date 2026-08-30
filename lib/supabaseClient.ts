@@ -1,112 +1,91 @@
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
-import { EmailRecord } from '@/types/email';
+import { EmailRecord, SupabaseConfigState } from '@/types/email';
 
-const LOCAL_STORAGE_KEY_URL = 'mailmind_supabase_url';
-const LOCAL_STORAGE_KEY_KEY = 'mailmind_supabase_anon_key';
+const DEFAULT_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const DEFAULT_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+export function getActiveSupabaseConfig(): SupabaseConfigState {
+  if (typeof window !== 'undefined') {
+    const customUrl = localStorage.getItem('nodify_supabase_url') || localStorage.getItem('mailmind_supabase_url');
+    const customKey = localStorage.getItem('nodify_supabase_key') || localStorage.getItem('mailmind_supabase_key');
+    if (customUrl && customKey) {
+      return {
+        url: customUrl,
+        anonKey: customKey,
+        source: 'custom',
+        isConnected: true,
+      };
+    }
+  }
+
+  if (DEFAULT_URL && DEFAULT_KEY) {
+    return {
+      url: DEFAULT_URL,
+      anonKey: DEFAULT_KEY,
+      source: 'env',
+      isConnected: true,
+    };
+  }
+
+  return {
+    url: '',
+    anonKey: '',
+    source: 'none',
+    isConnected: false,
+  };
+}
 
 let cachedClient: SupabaseClient | null = null;
-let currentClientKey = '';
-
-export function getActiveSupabaseConfig(): {
-  url: string;
-  anonKey: string;
-  source: 'env' | 'custom' | 'none';
-} {
-  // Check browser localStorage first for runtime override
-  if (typeof window !== 'undefined') {
-    const customUrl = localStorage.getItem(LOCAL_STORAGE_KEY_URL)?.trim();
-    const customKey = localStorage.getItem(LOCAL_STORAGE_KEY_KEY)?.trim();
-    if (customUrl && customKey) {
-      return { url: customUrl, anonKey: customKey, source: 'custom' };
-    }
-  }
-
-  // Next.js standard or Vite env vars
-  const envUrl = (
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    process.env.VITE_SUPABASE_URL ||
-    ''
-  ).trim();
-
-  const envKey = (
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.VITE_SUPABASE_ANON_KEY ||
-    ''
-  ).trim();
-
-  if (envUrl && envKey) {
-    return { url: envUrl, anonKey: envKey, source: 'env' };
-  }
-
-  return { url: '', anonKey: '', source: 'none' };
-}
-
-export function saveCustomSupabaseConfig(url: string, anonKey: string): void {
-  if (typeof window !== 'undefined') {
-    if (url && anonKey) {
-      localStorage.setItem(LOCAL_STORAGE_KEY_URL, url.trim());
-      localStorage.setItem(LOCAL_STORAGE_KEY_KEY, anonKey.trim());
-    } else {
-      localStorage.removeItem(LOCAL_STORAGE_KEY_URL);
-      localStorage.removeItem(LOCAL_STORAGE_KEY_KEY);
-    }
-    cachedClient = null;
-    currentClientKey = '';
-  }
-}
-
-export function clearCustomSupabaseConfig(): void {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(LOCAL_STORAGE_KEY_URL);
-    localStorage.removeItem(LOCAL_STORAGE_KEY_KEY);
-    cachedClient = null;
-    currentClientKey = '';
-  }
-}
+let cachedClientKey = '';
 
 export function getSupabaseClient(): SupabaseClient | null {
-  const { url, anonKey } = getActiveSupabaseConfig();
-  if (!url || !anonKey) {
+  const config = getActiveSupabaseConfig();
+  if (!config.url || !config.anonKey) {
     return null;
   }
-
-  const clientKey = `${url}:::${anonKey}`;
-  if (cachedClient && currentClientKey === clientKey) {
+  const keyIdentifier = `${config.url}::${config.anonKey}`;
+  if (cachedClient && cachedClientKey === keyIdentifier) {
     return cachedClient;
   }
-
   try {
-    cachedClient = createClient(url, anonKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-      realtime: {
-        params: {
-          eventsPerSecond: 10,
-        },
-      },
-    });
-    currentClientKey = clientKey;
+    cachedClient = createClient(config.url, config.anonKey);
+    cachedClientKey = keyIdentifier;
     return cachedClient;
-  } catch (err) {
-    console.error('Failed to initialize Supabase client:', err);
+  } catch (e) {
+    console.error('Error instantiating Supabase client:', e);
     return null;
   }
+}
+
+export const supabase: SupabaseClient | null = getSupabaseClient();
+
+export function saveCustomSupabaseConfig(url: string, anonKey: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('nodify_supabase_url', url.trim());
+    localStorage.setItem('nodify_supabase_key', anonKey.trim());
+  }
+  cachedClient = null;
+  cachedClientKey = '';
+}
+
+export function clearCustomSupabaseConfig() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('nodify_supabase_url');
+    localStorage.removeItem('nodify_supabase_key');
+    localStorage.removeItem('mailmind_supabase_url');
+    localStorage.removeItem('mailmind_supabase_key');
+  }
+  cachedClient = null;
+  cachedClientKey = '';
 }
 
 export async function fetchEmailsFromSupabase(): Promise<{
   data: EmailRecord[] | null;
   error: string | null;
-  count: number;
 }> {
   const client = getSupabaseClient();
   if (!client) {
-    return {
-      data: null,
-      error: 'Supabase credentials not configured. Please supply VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
-      count: 0,
-    };
+    return { data: null, error: 'Supabase credentials not configured' };
   }
 
   try {
@@ -116,28 +95,71 @@ export async function fetchEmailsFromSupabase(): Promise<{
       .order('received_at', { ascending: false });
 
     if (error) {
-      return { data: null, error: error.message, count: 0 };
+      return { data: null, error: error.message };
     }
 
-    return {
-      data: (data as EmailRecord[]) || [],
-      error: null,
-      count: data?.length || 0,
-    };
+    return { data: (data as EmailRecord[]) || [], error: null };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown network or query error';
-    return { data: null, error: message, count: 0 };
+    return {
+      data: null,
+      error: err instanceof Error ? err.message : 'Failed to query Supabase',
+    };
   }
 }
 
-export async function insertEmailRecord(record: Partial<EmailRecord>): Promise<{
-  success: boolean;
-  data?: EmailRecord;
-  error?: string;
-}> {
+export function subscribeToEmailChanges(
+  onInsert?: (record: EmailRecord) => void,
+  onUpdate?: (record: EmailRecord) => void,
+  onDelete?: (record: { id: string | number }) => void,
+  onStatusChange?: (status: string) => void
+): RealtimeChannel | null {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  const channel = client
+    .channel('emails-realtime-changes')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'emails' },
+      (payload) => {
+        if (onInsert && payload.new) {
+          onInsert(payload.new as EmailRecord);
+        }
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'emails' },
+      (payload) => {
+        if (onUpdate && payload.new) {
+          onUpdate(payload.new as EmailRecord);
+        }
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'emails' },
+      (payload) => {
+        if (onDelete && payload.old) {
+          onDelete({ id: (payload.old as { id: string | number }).id });
+        }
+      }
+    )
+    .subscribe((status) => {
+      if (onStatusChange) {
+        onStatusChange(status);
+      }
+    });
+
+  return channel;
+}
+
+export async function insertEmailRecord(
+  record: Partial<EmailRecord>
+): Promise<{ success: boolean; data?: EmailRecord; error?: string }> {
   const client = getSupabaseClient();
   if (!client) {
-    return { success: false, error: 'Supabase client is not initialized' };
+    return { success: false, error: 'Supabase client unavailable' };
   }
 
   try {
@@ -147,11 +169,7 @@ export async function insertEmailRecord(record: Partial<EmailRecord>): Promise<{
       received_at: record.received_at || new Date().toISOString(),
     };
 
-    const { data, error } = await client
-      .from('emails')
-      .insert([payload])
-      .select()
-      .single();
+    const { data, error } = await client.from('emails').insert([payload]).select().single();
 
     if (error) {
       return { success: false, error: error.message };
@@ -159,116 +177,37 @@ export async function insertEmailRecord(record: Partial<EmailRecord>): Promise<{
 
     return { success: true, data: data as EmailRecord };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Insert error';
-    return { success: false, error: msg };
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Insert operation failed',
+    };
   }
 }
 
-export async function deleteEmailRecord(id: string | number): Promise<{
-  success: boolean;
-  error?: string;
-}> {
+export async function seedSampleRecordsToSupabase(
+  records: EmailRecord[]
+): Promise<{ success: boolean; inserted: number; error?: string }> {
   const client = getSupabaseClient();
   if (!client) {
-    return { success: false, error: 'Supabase client not initialized' };
+    return { success: false, inserted: 0, error: 'Supabase client unavailable' };
   }
 
   try {
-    const { error } = await client
-      .from('emails')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-    return { success: true };
-  } catch (err: unknown) {
-    return { success: false, error: err instanceof Error ? err.message : 'Delete error' };
-  }
-}
-
-export async function seedSampleRecordsToSupabase(samples: EmailRecord[]): Promise<{
-  success: boolean;
-  inserted: number;
-  error?: string;
-}> {
-  const client = getSupabaseClient();
-  if (!client) {
-    return { success: false, inserted: 0, error: 'Supabase client not initialized' };
-  }
-
-  try {
-    // Strip client-side custom string IDs if table has serial or uuid default
-    const formatted = samples.map((s) => {
-      const copy = { ...s };
-      // If id is 'em-001', we can keep it if id is text/varchar or omit if autoincrement
-      return copy;
-    });
-
     const { data, error } = await client
       .from('emails')
-      .upsert(formatted, { onConflict: 'id' })
+      .upsert(records, { onConflict: 'id' })
       .select();
 
     if (error) {
       return { success: false, inserted: 0, error: error.message };
     }
 
-    return { success: true, inserted: data?.length || 0 };
+    return { success: true, inserted: data ? data.length : records.length };
   } catch (err: unknown) {
-    return { success: false, inserted: 0, error: err instanceof Error ? err.message : 'Seed error' };
-  }
-}
-
-export function subscribeToEmailChanges(
-  onInsert: (record: EmailRecord) => void,
-  onUpdate: (record: EmailRecord) => void,
-  onDelete: (oldRecord: { id: string | number }) => void,
-  onStatusChange?: (status: string) => void
-): RealtimeChannel | null {
-  const client = getSupabaseClient();
-  if (!client) return null;
-
-  try {
-    const channel = client
-      .channel('schema-db-changes-emails')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'emails' },
-        (payload) => {
-          if (payload.new) {
-            onInsert(payload.new as EmailRecord);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'emails' },
-        (payload) => {
-          if (payload.new) {
-            onUpdate(payload.new as EmailRecord);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'emails' },
-        (payload) => {
-          if (payload.old) {
-            onDelete(payload.old as { id: string | number });
-          }
-        }
-      )
-      .subscribe((status) => {
-        if (onStatusChange) {
-          onStatusChange(status);
-        }
-      });
-
-    return channel;
-  } catch (err) {
-    console.error('Error setting up Supabase realtime subscription:', err);
-    return null;
+    return {
+      success: false,
+      inserted: 0,
+      error: err instanceof Error ? err.message : 'Seeding failed',
+    };
   }
 }

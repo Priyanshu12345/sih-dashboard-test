@@ -2,17 +2,17 @@ import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  title: 'My Google AI Studio App',
-  description: 'An application built with Google AI Studio.',
+  title: 'Nodify - AI Email Intelligence Dashboard',
+  description: 'AI Email Intelligence Dashboard to organize, prioritize, and summarize emails with real-time sync.',
   openGraph: {
-    title: 'My Google AI Studio App',
-    description: 'An application built with Google AI Studio.',
+    title: 'Nodify - AI Email Intelligence Dashboard',
+    description: 'AI Email Intelligence Dashboard to organize, prioritize, and summarize emails with real-time sync.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'My Google AI Studio App',
-    description: 'An application built with Google AI Studio.',
+    title: 'Nodify - AI Email Intelligence Dashboard',
+    description: 'AI Email Intelligence Dashboard to organize, prioritize, and summarize emails with real-time sync.',
   },
 };
 

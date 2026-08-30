@@ -45,12 +45,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Left: Brand Identity */}
         <div className="flex items-center space-x-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-white font-bold text-lg shadow-sm">
-            <span>M</span>
+            <span>N</span>
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white leading-none">MailMind</h1>
+              <h1 className="text-lg font-bold text-white leading-none">Nodify</h1>
             </div>
             <p className="text-[10px] text-teal-400 font-medium tracking-wider uppercase mt-0.5">
               AI Email Intelligence

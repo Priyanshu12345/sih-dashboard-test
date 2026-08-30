@@ -20,6 +20,7 @@ import {
   Calendar,
   AlertTriangle,
   RotateCcw,
+  User,
 } from 'lucide-react';
 import {
   EmailRecord,
@@ -51,7 +52,7 @@ export const EmailTable: React.FC<EmailTableProps> = ({
   // Local Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [actionFilter, setActionFilter] = useState('all'); // 'all' | 'true' | 'false'
+  const [actionFilter, setActionFilter] = useState('all');
   const [validationFilter, setValidationFilter] = useState('all');
 
   // Sorting state (default: received_at descending)
@@ -62,7 +63,7 @@ export const EmailTable: React.FC<EmailTableProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 8;
 
-  // Extract unique categories & validation statuses dynamically
+  // Extract unique categories dynamically
   const dynamicCategories = useMemo(() => {
     const set = new Set<string>();
     emails.forEach((e) => {
@@ -222,19 +223,12 @@ export const EmailTable: React.FC<EmailTableProps> = ({
     return `${pct}%`;
   };
 
-  const getConfidencePct = (conf: number | string | undefined | null) => {
-    if (conf === undefined || conf === null || conf === '') return 0;
-    const val = Number(conf);
-    if (isNaN(val)) return 0;
-    return val <= 1 ? val * 100 : val;
-  };
-
   const formatReceivedDate = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A';
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
     } catch {
       return dateStr;
     }
@@ -242,22 +236,22 @@ export const EmailTable: React.FC<EmailTableProps> = ({
 
   const getPriorityBadge = (priority?: string) => {
     const p = String(priority).toUpperCase();
-    if (p === 'HIGH') {
+    if (p === 'HIGH' || p === 'URGENT') {
       return (
-        <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-[11px] font-medium">
+        <span className="rounded-full bg-rose-500/10 border border-rose-500/30 px-2.5 py-1 text-[11px] font-bold text-rose-600 dark:text-rose-400">
           HIGH
         </span>
       );
     }
     if (p === 'MEDIUM') {
       return (
-        <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded text-[11px] font-medium">
+        <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
           MEDIUM
         </span>
       );
     }
     return (
-      <span className="bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded text-[11px] font-medium">
+      <span className="rounded-full bg-teal-500/10 border border-teal-500/30 px-2.5 py-1 text-[11px] font-bold text-teal-600 dark:text-teal-400">
         LOW
       </span>
     );
@@ -268,19 +262,19 @@ export const EmailTable: React.FC<EmailTableProps> = ({
     return (
       <div
         id="email-table-error-state"
-        className="bg-[#0d1117] border border-rose-500/40 rounded-xl p-8 text-center"
+        className="rounded-2xl border border-rose-500/30 bg-[var(--bg-card)] p-8 text-center shadow-sm"
       >
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-400">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-500">
           <AlertCircle className="h-6 w-6" />
         </div>
-        <h3 className="mt-4 text-base font-bold text-white">Unable to connect to Supabase</h3>
-        <p className="mt-1 font-mono text-xs text-rose-300/80 max-w-xl mx-auto">
+        <h3 className="mt-4 text-base font-bold text-[var(--text-main)]">Unable to connect to Supabase</h3>
+        <p className="mt-1 font-mono text-xs text-rose-400 max-w-xl mx-auto">
           {error}
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <button
             onClick={onRetry}
-            className="flex items-center gap-2 rounded-md bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-rose-500"
+            className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-rose-500 shadow-md"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             <span>Retry Connection</span>
@@ -293,22 +287,25 @@ export const EmailTable: React.FC<EmailTableProps> = ({
   return (
     <div
       id="processed-emails-bento-card"
-      className="bg-[#0d1117] border border-[#30363d] rounded-xl flex flex-col overflow-hidden"
+      className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm flex flex-col overflow-hidden transition-colors"
     >
-      {/* Bento Header Bar with Search & Filters */}
-      <div className="px-5 py-4 border-b border-[#30363d] flex flex-wrap justify-between items-center gap-3">
-        <div className="flex items-center space-x-2">
-          <h3 className="font-bold text-white text-base">Processed Emails</h3>
-          <span className="bg-[#161b22] text-xs px-2 py-0.5 rounded-full border border-[#30363d] text-gray-400 font-mono">
-            {filteredEmails.length}
-          </span>
+      {/* Header Bar with Title, Search & Filters (Reference layout: Customer Order table) */}
+      <div className="px-6 py-5 border-b border-[var(--border-color)] flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="font-extrabold text-[var(--text-main)] text-base">Recent Emails</h3>
+            <span className="rounded-full bg-[var(--bg-main)] text-xs px-2.5 py-0.5 border border-[var(--border-color)] text-[var(--text-muted)] font-mono font-bold">
+              {filteredEmails.length}
+            </span>
+          </div>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">Live activity log with AI classification</p>
         </div>
 
         {/* Filter Controls */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Search Input */}
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               id="table-search-input"
               type="text"
@@ -317,44 +314,27 @@ export const EmailTable: React.FC<EmailTableProps> = ({
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search emails..."
-              className="bg-[#161b22] border border-[#30363d] text-xs rounded-md pl-8 pr-7 py-1.5 outline-none text-[#c9d1d9] placeholder-gray-500 focus:border-teal-500 w-44 sm:w-56"
+              placeholder="Search sender, subject..."
+              className="w-48 sm:w-60 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] py-1.5 pl-9 pr-3 text-xs text-[var(--text-main)] placeholder-[var(--text-subtle)] focus:border-teal-500 outline-none transition-colors"
             />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-main)]"
               >
                 <X className="h-3 w-3" />
               </button>
             )}
           </div>
 
-          {/* Priority Select */}
+          {/* Category Dropdown */}
           <select
-            id="filter-priority-select"
-            value={activePriorityFilter}
-            onChange={(e) => {
-              if (onPriorityFilterChange) onPriorityFilterChange(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="bg-[#161b22] border border-[#30363d] text-xs rounded-md px-2.5 py-1.5 outline-none text-[#c9d1d9] focus:border-teal-500"
-          >
-            <option value="all">All Priorities</option>
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
-          </select>
-
-          {/* Category Select */}
-          <select
-            id="filter-category-select"
             value={categoryFilter}
             onChange={(e) => {
               setCategoryFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="bg-[#161b22] border border-[#30363d] text-xs rounded-md px-2.5 py-1.5 outline-none text-[#c9d1d9] focus:border-teal-500"
+            className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] px-3 py-1.5 text-xs font-semibold text-[var(--text-main)] outline-none cursor-pointer hover:bg-[var(--bg-card-hover)] transition-colors"
           >
             <option value="all">All Categories</option>
             {dynamicCategories.map((cat) => (
@@ -364,232 +344,133 @@ export const EmailTable: React.FC<EmailTableProps> = ({
             ))}
           </select>
 
-          {/* Action Select */}
-          <select
-            id="filter-action-select"
-            value={actionFilter}
-            onChange={(e) => {
-              setActionFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="bg-[#161b22] border border-[#30363d] text-xs rounded-md px-2.5 py-1.5 outline-none text-[#c9d1d9] focus:border-teal-500"
-          >
-            <option value="all">Action: Any</option>
-            <option value="true">Action Required</option>
-            <option value="false">No Action</option>
-          </select>
-
+          {/* Reset Filters */}
           {hasActiveFilters && (
             <button
               onClick={handleResetFilters}
-              title="Reset all filters"
-              className="bg-[#161b22] border border-[#30363d] text-gray-400 hover:text-white p-1.5 rounded-md text-xs transition-colors"
+              className="flex items-center gap-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] px-2.5 py-1.5 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 transition-colors"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
+              <RotateCcw className="h-3 w-3" />
+              <span>Reset</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Main Table */}
+      {/* Table Content */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead className="bg-[#161b22] text-[10px] uppercase text-gray-400 sticky top-0 border-b border-[#30363d]">
+        <table className="w-full text-left text-xs">
+          <thead className="border-b border-[var(--border-color)] bg-[var(--bg-main)]/50 text-[var(--text-muted)] uppercase tracking-wider font-bold text-[10px]">
             <tr>
-              {/* Priority */}
-              <th
-                onClick={() => handleSort('final_priority')}
-                className="p-3 cursor-pointer hover:text-white"
-              >
+              <th className="px-6 py-3.5">Profile / Sender</th>
+              <th className="px-6 py-3.5">Subject & Category</th>
+              <th className="px-6 py-3.5 cursor-pointer hover:text-[var(--text-main)]" onClick={() => handleSort('received_at')}>
+                <div className="flex items-center gap-1">
+                  <span>Date</span>
+                  <ArrowUpDown className="h-3 w-3" />
+                </div>
+              </th>
+              <th className="px-6 py-3.5 cursor-pointer hover:text-[var(--text-main)]" onClick={() => handleSort('final_priority')}>
                 <div className="flex items-center gap-1">
                   <span>Priority</span>
-                  {sortField === 'final_priority' ? (
-                    sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-teal-400" /> : <ArrowDown className="h-3 w-3 text-teal-400" />
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 text-gray-600" />
-                  )}
+                  <ArrowUpDown className="h-3 w-3" />
                 </div>
               </th>
-
-              {/* Sender */}
-              <th className="p-3">Sender</th>
-
-              {/* Subject */}
-              <th className="p-3 min-w-[180px]">Subject</th>
-
-              {/* Category */}
-              <th className="p-3">Category</th>
-
-              {/* Action Required */}
-              <th className="p-3 text-center">Action</th>
-
-              {/* Deadline */}
-              <th
-                onClick={() => handleSort('deadline')}
-                className="p-3 cursor-pointer hover:text-white"
-              >
-                <div className="flex items-center gap-1">
-                  <span>Deadline</span>
-                  {sortField === 'deadline' ? (
-                    sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-teal-400" /> : <ArrowDown className="h-3 w-3 text-teal-400" />
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 text-gray-600" />
-                  )}
-                </div>
-              </th>
-
-              {/* Confidence */}
-              <th
-                onClick={() => handleSort('confidence')}
-                className="p-3 cursor-pointer hover:text-white"
-              >
-                <div className="flex items-center gap-1">
-                  <span>Confidence</span>
-                  {sortField === 'confidence' ? (
-                    sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-teal-400" /> : <ArrowDown className="h-3 w-3 text-teal-400" />
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 text-gray-600" />
-                  )}
-                </div>
-              </th>
-
-              {/* Status */}
-              <th className="p-3 text-center">Status</th>
-
-              {/* Received */}
-              <th
-                onClick={() => handleSort('received_at')}
-                className="p-3 cursor-pointer hover:text-white text-right"
-              >
-                <div className="flex items-center justify-end gap-1">
-                  <span>Time</span>
-                  {sortField === 'received_at' ? (
-                    sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-teal-400" /> : <ArrowDown className="h-3 w-3 text-teal-400" />
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 text-gray-600" />
-                  )}
-                </div>
-              </th>
+              <th className="px-6 py-3.5 text-right">Action</th>
             </tr>
           </thead>
-
-          <tbody className="divide-y divide-[#30363d]">
+          <tbody className="divide-y divide-[var(--border-color)]">
             {isLoading ? (
-              [1, 2, 3, 4, 5].map((i) => (
-                <tr key={i} className="animate-pulse">
-                  <td className="p-3"><div className="h-4 w-12 rounded bg-[#161b22]" /></td>
-                  <td className="p-3"><div className="h-4 w-28 rounded bg-[#161b22]" /></td>
-                  <td className="p-3"><div className="h-4 w-40 rounded bg-[#161b22]" /></td>
-                  <td className="p-3"><div className="h-4 w-16 rounded bg-[#161b22]" /></td>
-                  <td className="p-3"><div className="h-4 w-10 mx-auto rounded bg-[#161b22]" /></td>
-                  <td className="p-3"><div className="h-4 w-20 rounded bg-[#161b22]" /></td>
-                  <td className="p-3"><div className="h-4 w-16 rounded bg-[#161b22]" /></td>
-                  <td className="p-3"><div className="h-4 w-12 mx-auto rounded bg-[#161b22]" /></td>
-                  <td className="p-3"><div className="h-4 w-12 ml-auto rounded bg-[#161b22]" /></td>
+              [1, 2, 3, 4, 5].map((n) => (
+                <tr key={n} className="animate-pulse">
+                  <td className="px-6 py-4"><div className="h-4 w-32 rounded bg-[var(--border-color)]" /></td>
+                  <td className="px-6 py-4"><div className="h-4 w-48 rounded bg-[var(--border-color)]" /></td>
+                  <td className="px-6 py-4"><div className="h-4 w-16 rounded bg-[var(--border-color)]" /></td>
+                  <td className="px-6 py-4"><div className="h-4 w-16 rounded bg-[var(--border-color)]" /></td>
+                  <td className="px-6 py-4 text-right"><div className="h-4 w-12 rounded bg-[var(--border-color)] ml-auto" /></td>
                 </tr>
               ))
             ) : paginatedEmails.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center">
-                  <Inbox className="mx-auto h-8 w-8 text-gray-600" />
-                  <h4 className="mt-2 text-xs font-semibold text-gray-300">
-                    No emails match your filter criteria
-                  </h4>
-                  {hasActiveFilters && (
-                    <button
-                      onClick={handleResetFilters}
-                      className="mt-3 rounded-md bg-[#161b22] border border-[#30363d] px-3 py-1.5 text-xs text-teal-400 hover:bg-[#21262d]"
-                    >
-                      Clear Filters
-                    </button>
-                  )}
+                <td colSpan={5} className="px-6 py-12 text-center text-[var(--text-muted)]">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--bg-main)] mb-3">
+                    <Inbox className="h-6 w-6 text-[var(--text-subtle)]" />
+                  </div>
+                  <p className="font-bold text-sm text-[var(--text-main)]">No records found</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">Try adjusting search or priority filters</p>
                 </td>
               </tr>
             ) : (
-              paginatedEmails.map((email) => {
-                const confPct = getConfidencePct(email.confidence);
+              paginatedEmails.map((item) => {
+                const initials = (item.sender || 'U')
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')
+                  .substring(0, 2)
+                  .toUpperCase();
 
                 return (
                   <tr
-                    key={email.id}
-                    onClick={() => onSelectEmail(email)}
-                    className="hover:bg-[#21262d] transition-colors cursor-pointer"
+                    key={item.id}
+                    onClick={() => onSelectEmail(item)}
+                    className="group cursor-pointer transition-colors hover:bg-[var(--bg-card-hover)]"
                   >
+                    {/* Profile / Sender */}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-white font-bold text-xs shadow-sm">
+                          {initials}
+                        </div>
+                        <div>
+                          <div className="font-bold text-[var(--text-main)] group-hover:text-blue-500 transition-colors">
+                            {item.sender || 'Unknown Sender'}
+                          </div>
+                          <div className="text-[11px] text-[var(--text-muted)] font-mono truncate max-w-[140px]">
+                            {item.sender ? `${item.sender.toLowerCase().replace(/\s+/g, '.')}@org` : 'email@domain'}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Subject & Category */}
+                    <td className="px-6 py-4 max-w-xs">
+                      <div className="font-semibold text-[var(--text-main)] truncate">
+                        {item.subject || 'No Subject'}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="rounded bg-[var(--bg-main)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-muted)] border border-[var(--border-color)]">
+                          {item.category || 'General'}
+                        </span>
+                        {item.action_required && (
+                          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                            Action Req.
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Date */}
+                    <td className="px-6 py-4 whitespace-nowrap text-[var(--text-muted)] font-medium">
+                      {formatReceivedDate(item.received_at)}
+                    </td>
+
                     {/* Priority */}
-                    <td className="p-3 whitespace-nowrap">
-                      {getPriorityBadge(email.final_priority)}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getPriorityBadge(item.final_priority || item.ai_priority)}
                     </td>
 
-                    {/* Sender */}
-                    <td className="p-3 whitespace-nowrap font-mono text-gray-300">
-                      {email.sender}
-                    </td>
-
-                    {/* Subject & Summary */}
-                    <td className="p-3 max-w-xs">
-                      <div className="font-semibold text-white truncate">
-                        {email.subject}
-                      </div>
-                      {email.summary && (
-                        <div className="text-[10px] text-gray-500 truncate mt-0.5">
-                          {email.summary}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Category */}
-                    <td className="p-3 whitespace-nowrap text-gray-400">
-                      {email.category || 'General'}
-                    </td>
-
-                    {/* Action Required */}
-                    <td className="p-3 text-center whitespace-nowrap">
-                      {email.action_required ? (
-                        <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                          YES
-                        </span>
-                      ) : (
-                        <span className="text-gray-500 text-[10px]">NO</span>
-                      )}
-                    </td>
-
-                    {/* Deadline */}
-                    <td className="p-3 whitespace-nowrap font-mono text-gray-300">
-                      {email.deadline ? (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-teal-400" />
-                          <span>{String(email.deadline)}</span>
-                        </span>
-                      ) : (
-                        <span className="text-gray-600">—</span>
-                      )}
-                    </td>
-
-                    {/* Confidence Meter */}
-                    <td className="p-3 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 bg-gray-800 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            style={{ width: `${Math.min(confPct, 100)}%` }}
-                            className="bg-teal-500 h-1.5 rounded-full"
-                          />
-                        </div>
-                        <span className="font-mono text-[10px] text-gray-400">
-                          {formatConfidence(email.confidence)}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Validation Status */}
-                    <td className="p-3 text-center whitespace-nowrap">
-                      <span className="text-xs text-green-400 font-medium">
-                        {String(email.validation_status || 'VALID').toUpperCase()}
-                      </span>
-                    </td>
-
-                    {/* Time */}
-                    <td className="p-3 text-right whitespace-nowrap text-gray-500 font-mono text-[11px]">
-                      {formatReceivedDate(email.received_at)}
+                    {/* Action */}
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectEmail(item);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] px-3 py-1.5 text-xs font-semibold text-[var(--text-main)] hover:bg-blue-600 hover:text-white transition-all"
+                      >
+                        <span>View</span>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
                     </td>
                   </tr>
                 );
@@ -599,28 +480,28 @@ export const EmailTable: React.FC<EmailTableProps> = ({
         </table>
       </div>
 
-      {/* Bento Bottom Bar */}
-      <div className="p-3 border-t border-[#30363d] bg-[#161b22]/30 flex flex-wrap justify-between items-center text-[10px] text-gray-500 uppercase font-bold tracking-widest gap-2">
-        <span>
-          Showing {(currentPage - 1) * pageSize + (sortedEmails.length > 0 ? 1 : 0)} -{' '}
-          {Math.min(currentPage * pageSize, sortedEmails.length)} of {sortedEmails.length} records
-        </span>
+      {/* Pagination Footer */}
+      <div className="px-6 py-4 border-t border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-main)]/30 text-xs text-[var(--text-muted)]">
+        <div>
+          Showing <span className="font-bold text-[var(--text-main)]">{paginatedEmails.length}</span> of{' '}
+          <span className="font-bold text-[var(--text-main)]">{sortedEmails.length}</span> records
+        </div>
 
-        <div className="flex items-center gap-2 normal-case font-normal">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="bg-[#161b22] border border-[#30363d] text-gray-300 hover:text-white px-2.5 py-1 rounded text-xs disabled:opacity-40"
+            className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 font-semibold text-[var(--text-main)] disabled:opacity-40 hover:bg-[var(--bg-card-hover)] transition-colors"
           >
-            Prev
+            Previous
           </button>
-          <span className="font-mono text-xs text-gray-400">
-            {currentPage} / {totalPages}
+          <span className="font-mono text-xs text-[var(--text-main)] font-bold">
+            Page {currentPage} of {totalPages}
           </span>
           <button
-            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="bg-[#161b22] border border-[#30363d] text-gray-300 hover:text-white px-2.5 py-1 rounded text-xs disabled:opacity-40"
+            className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 font-semibold text-[var(--text-main)] disabled:opacity-40 hover:bg-[var(--bg-card-hover)] transition-colors"
           >
             Next
           </button>

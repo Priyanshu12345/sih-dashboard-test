@@ -3,6 +3,8 @@ export type ValidationStatus = 'VALID' | 'INVALID' | 'PENDING' | 'WARNING';
 
 export interface EmailRecord {
   id: string | number;
+  message_id?: string | null;
+  thread_id?: string | null;
   sender: string;
   subject: string;
   body: string;
@@ -15,6 +17,8 @@ export interface EmailRecord {
   summary?: string | null;
   confidence: number;
   days_remaining?: number | null;
+  deadline_status?: string | null;
+  should_alert?: boolean | null;
   validation_status: ValidationStatus | string;
   received_at?: string | null;
   created_at?: string | null;
@@ -39,3 +43,4 @@ export interface SupabaseConfigState {
   isConnected: boolean;
   error?: string | null;
 }
+
